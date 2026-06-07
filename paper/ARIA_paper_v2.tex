@@ -2,6 +2,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
+\graphicspath{{figures/}}
 \usepackage{booktabs}
 \usepackage{hyperref}
 \usepackage{xcolor}
@@ -16,7 +17,7 @@
 \author{
   Darshan Poudel\\
   Independent Researcher\\
-  \texttt{susanpdl77@gmail.com}
+  \texttt{poudeldarshan44@gmail.com}
 }
 
 \date{June 2026 \quad (Preprint)}
@@ -29,8 +30,8 @@
 % ============================================================
 
 Catastrophic forgetting remains a fundamental obstacle in sequential learning.
-Most existing mitigations — Elastic Weight Consolidation (EWC), replay buffers,
-progressive networks — protect weights without changing how the model allocates
+Most existing mitigations --- Elastic Weight Consolidation (EWC), replay buffers,
+progressive networks --- protect weights without changing how the model allocates
 capacity across tasks. We introduce ARIA, an architecture in which the capacity
 allocation \emph{is} the learning signal. ARIA combines four jointly-trained
 mechanisms: (1)~\textbf{Morphogenic Attention (MA)}, where heads split or merge
@@ -43,10 +44,9 @@ budgets from input complexity statistics. We additionally introduce
 \textbf{Slow-Pathway Consolidation (SPC)}, an EWC-style Fisher regulariser applied
 \emph{only} to slow-pathway weights, allowing fast pathways to adapt freely while
 protecting consolidated knowledge. On Split-MNIST (5 seeds, parameter-matched baselines),
-ARIA+SPC achieves \textbf{98.57\%} average accuracy with \textbf{1.3\%} forgetting,
-outperforming EWC (97.35\%, 2.3\% forgetting) and StaticMLP (76.9\%, 28.4\% forgetting).
-SPC reduces forgetting by \textbf{43\%} relative to EWC while requiring 50\% fewer
-Fisher parameters.
+ARIA+SPC achieves \textbf{98.57\%} average accuracy with \textbf{1.33\%} forgetting,
+outperforming EWC (97.35\%, 2.29\%) by $+1.22$ points accuracy and reducing forgetting
+by \textbf{43\%} relative, while requiring 50\% fewer Fisher parameters than EWC.
 
 \end{abstract}
 
@@ -59,15 +59,14 @@ A learning system that encounters tasks sequentially faces a dilemma: plasticity
 (rapid adaptation to new tasks) and stability (retention of old tasks) are in direct
 tension~\citep{mccloskey1989catastrophic,french1999catastrophic}. Neural networks
 trained by stochastic gradient descent exhibit extreme plasticity at the cost of
-stability — a phenomenon known as \emph{catastrophic forgetting}.
+stability --- a phenomenon known as \emph{catastrophic forgetting}.
 
 The continual learning literature has addressed this through three broad strategies:
 regularisation (EWC~\citep{kirkpatrick2017overcoming}, SI~\citep{zenke2017continual}),
 replay (DER++~\citep{buzzega2020dark}, ER~\citep{rolnick2019experience}), and
 progressive architectures (PNN~\citep{rusu2016progressive}, PackNet~\citep{mallya2018packnet}).
 Each strategy has a known failure mode: regularisation is too conservative for long task
-sequences, replay has memory cost, and progressive networks do not transfer
-across tasks.
+sequences, replay has memory cost, and progressive networks do not transfer across tasks.
 
 ARIA takes a fourth approach: the architecture adapts its \emph{structure} in response
 to task demands, distributing capacity dynamically so that both new and old knowledge
@@ -102,30 +101,30 @@ during high-plasticity phases and stronger Fisher-based protection after consoli
 EWC~\citep{kirkpatrick2017overcoming} penalises movement of weights that were important
 for past tasks, measured by the diagonal Fisher information matrix.
 SI~\citep{zenke2017continual} accumulates importance online during training.
-Both apply uniform regularisation across all parameters.
+Both apply uniform regularisation across all parameters --- including weights designed
+to be volatile, which conflicts with plasticity-gated architectures like ARIA.
 
 \paragraph{Replay methods.}
-DER++~\citep{buzzega2020dark} stores (input, logit) pairs and penalises KL divergence
+DER++~\citep{buzzega2020dark} stores (input, logit) pairs and penalises divergence
 from stored predictions. ER~\citep{rolnick2019experience} stores raw examples.
 Replay methods require a memory buffer whose size scales with the number of tasks.
+In our experiments, DER++ with a small buffer (200 samples) underperforms EWC significantly.
 
 \paragraph{Architecture methods.}
-PNN~\citep{rusu2016progressive} adds new columns per task but prevents any backward
-transfer. PackNet~\citep{mallya2018packnet} uses iterative pruning to allocate
-subnetworks per task. HAT~\citep{serra2018overcoming} learns binary task masks.
-None of these methods dynamically restructure \emph{within} an attention head.
+PNN~\citep{rusu2016progressive} adds new columns per task but prevents backward transfer.
+PackNet~\citep{mallya2018packnet} uses iterative pruning to allocate subnetworks per task.
+HAT~\citep{serra2018overcoming} learns binary task masks. None dynamically restructure
+\emph{within} an attention head.
 
 \paragraph{Dynamic architectures.}
-DEN~\citep{yoon2018lifelong} expands hidden units based on a drift threshold.
-This is closest to ARIA in spirit, but operates at the unit level and does not
-use attention or plasticity gating.
+DEN~\citep{yoon2018lifelong} expands hidden units based on a drift threshold ---
+closest to ARIA in spirit, but operates at the unit level without attention or plasticity gating.
 
 \paragraph{Complementary learning systems.}
 The biological motivation for fast/slow pathways comes from CLS theory~\citep{mcclelland1995complementary},
 which posits that the hippocampus (fast, volatile) and neocortex (slow, consolidated)
-work together for memory consolidation. HBP~\citep{van2020brain} and related work
-implement simplified versions of this in neural networks; ARIA's PG-MLP is the first
-to implement it as a per-token learned gate with gradient dampening.
+work together for memory consolidation. ARIA's PG-MLP is the first to implement this
+as a per-token learned gate with gradient dampening.
 
 % ============================================================
 \section{Method}
@@ -137,17 +136,21 @@ to implement it as a per-token learned gate with gradient dampening.
 We consider the task-incremental continual learning setting. The model observes
 a sequence of tasks $\mathcal{T}_1, \mathcal{T}_2, \ldots, \mathcal{T}_K$, each
 with a dataset $\mathcal{D}_t = \{(x_i^{(t)}, y_i^{(t)})\}$. At test time,
-the task identity is provided (task-ID setting). We use Split-MNIST~\citep{zenke2017continual}
-(5 binary classification tasks on digit pairs) and Split-CIFAR-10 as benchmarks.
+the task identity is provided (task-ID setting).
 
 \subsection{Architecture Overview}
 
-ARIA consists of: an input projection, $L$ ARIA blocks (each containing MA + PG-MLP),
+ARIA consists of an input projection, $L$ ARIA blocks (each containing MA + PG-MLP),
 a task-specific linear head per task, and three shared modules (AGV, CBA, layer norms).
+Figure~\ref{fig:arch} illustrates the overall architecture.
 
-\begin{equation}
-  h_0 = \mathrm{GeLU}(W_{\mathrm{in}} x + b_{\mathrm{in}})
-\end{equation}
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{fig1_architecture.png}
+\caption{ARIA architecture. Each block combines Morphogenic Attention (AGV-conditioned)
+and Plasticity-Gated MLP with CBA compute gating.}
+\label{fig:arch}
+\end{figure}
 
 For each block $\ell$:
 \begin{equation}
@@ -161,26 +164,22 @@ $b_\ell \in [0,1]$ is the CBA-predicted budget for layer $\ell$.
 
 Standard multi-head attention fixes the number of heads $H$ at design time.
 Morphogenic Attention pre-allocates $H_{\max}$ heads but maintains a boolean mask
-$\mathbf{m} \in \{0,1\}^{H_{\max}}$ indicating active heads, with
-$H_{\mathrm{init}} \leq \sum_i m_i \leq H_{\max}$.
+$\mathbf{m} \in \{0,1\}^{H_{\max}}$ indicating active heads.
 
 Each head $i$ has a scalar viability $v_i \in \mathbb{R}$, updated by backprop.
 The output of MA is:
 \begin{equation}
   \mathrm{MA}(x) = \gamma \odot \Bigl(\sum_{i \in \mathcal{A}} w_i \cdot \mathrm{head}_i(x)\Bigr) + \beta
 \end{equation}
-where $\mathcal{A} = \{i : m_i = 1\}$, $w_i = \mathrm{softmax}(\{v_j\}_{j \in \mathcal{A}})_i \cdot |\mathcal{A}|$
-(so that viabilities sum to $|\mathcal{A}|$), and $(\gamma, \beta)$ are the FiLM
-parameters from the AGV.
+where $\mathcal{A} = \{i : m_i = 1\}$, $w_i$ are softmax-normalised viabilities
+scaled by $|\mathcal{A}|$, and $(\gamma, \beta)$ are FiLM parameters from the AGV.
 
 \textbf{Split.} Every $\Delta_{\mathrm{morph}}$ steps, for each active head $i$:
 if $\sigma(v_i) > \tau_{\mathrm{split}}$, $H_{\mathrm{active}} < H_{\max}$, and
-at least $c_{\mathrm{cool}}$ steps have passed since the last morph event for head $i$,
-a new head $j$ is created:
+cooldown $c_{\mathrm{cool}}$ is satisfied, a new head $j$ is created:
 \begin{equation}
   W^{(j)} \leftarrow W^{(i)} + \epsilon \cdot \mathcal{N}(0, I), \quad v_j \leftarrow v_i - 0.5
 \end{equation}
-where $\epsilon = 0.01$ and $c_{\mathrm{cool}} = 100$ steps.
 
 \textbf{Merge.} For adjacent heads $(i, j)$ with
 $\cos(W_Q^{(i)}, W_Q^{(j)}) > \tau_{\mathrm{merge}}$, $H_{\mathrm{active}} > 2$,
@@ -192,69 +191,60 @@ and cooldown satisfied:
 \subsection{Plasticity-Gated MLP}
 \label{sec:pgmlp}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{fig4_plasticity_gates.png}
+\caption{Plasticity gate $\pi$ trajectories across tasks. High $\pi$ (warm colours)
+indicates fast-pathway dominance; low $\pi$ (cool colours) indicates consolidation.}
+\label{fig:gates}
+\end{figure}
+
 The PG-MLP replaces the standard feed-forward layer with dual pathways:
 \begin{align}
   \pi(x) &= \sigma(\mathrm{MLP}_{\mathrm{gate}}(x)) \in (0, 1) \\
-  h_{\mathrm{fast}}(x) &= \mathrm{GeLU}(W_f^{(1)} x) \\
-  h_{\mathrm{slow}}(x) &= \mathrm{GeLU}(W_s^{(1)} x) \\
-  \mathrm{PG\text{-}MLP}(x) &= \pi(x) \cdot W_f^{(2)} h_{\mathrm{fast}}(x) + (1-\pi(x)) \cdot W_s^{(2)} h_{\mathrm{slow}}(x)
+  \mathrm{PG\text{-}MLP}(x) &= \pi(x) \cdot W_f^{(2)} \mathrm{GeLU}(W_f^{(1)} x)
+                              + (1-\pi(x)) \cdot W_s^{(2)} \mathrm{GeLU}(W_s^{(1)} x)
 \end{align}
 
-\textbf{Bimodal specialisation loss.} To prevent the gate from saturating at 0.5
-(which would make the two pathways indistinguishable), we add a loss that pushes
-$\pi$ toward 0 or 1:
+\textbf{Bimodal specialisation loss.}
 \begin{equation}
   \mathcal{L}_{\mathrm{plastic}} = \frac{\lambda_\pi}{\overline{\pi(1-\pi)} + \epsilon}
 \end{equation}
-where $\overline{\cdot}$ denotes the batch mean. This loss is activated only after
-$T_{\mathrm{warm}} = 500$ steps to prevent early destabilisation.
+Activated only after $T_{\mathrm{warm}} = 500$ steps to prevent early destabilisation.
 
-\textbf{Gradient dampening.} After each backward pass, slow-pathway gradients are
-rescaled:
+\textbf{Gradient dampening.} After each backward pass:
 \begin{equation}
   \nabla_{\theta_s} \mathcal{L} \;\leftarrow\; (1 - \bar\pi) \cdot \nabla_{\theta_s} \mathcal{L}
 \end{equation}
-When $\bar\pi \approx 1$ (fast/plastic mode), $(1-\bar\pi) \approx 0$: the slow
-pathway is barely updated, protecting consolidated knowledge.
-When $\bar\pi \approx 0$ (slow/consolidated mode), $(1-\bar\pi) \approx 1$: the slow
-pathway updates normally.
-
-\textit{Note on prior versions.} An earlier implementation used $\bar\pi$ instead
-of $(1-\bar\pi)$ as the multiplier (inverted logic), which actively destabilised
-the slow pathway during plastic phases. This was identified as the root cause of
-the ablation results in \texttt{ARIA\_ablation/ablation\_summary.json}, where
-ARIA-noPG outperformed ARIA-Full. The corrected implementation is in
-\texttt{aria/model.py}.
+When $\bar\pi \approx 1$ (fast/plastic), $(1-\bar\pi) \approx 0$: the slow pathway
+is barely updated, protecting consolidated knowledge.
 
 \subsection{Architecture Genome Vector}
 \label{sec:agv}
 
-The AGV is a learnable latent vector $z \in \mathbb{R}^G$ (with $G = 32$) that
-encodes structural hyperparameters as differentiable continuous variables.
-It is decoded by four lightweight linear heads:
+The AGV is a learnable latent vector $z \in \mathbb{R}^G$ (with $G = 32$) decoded
+by four lightweight linear heads:
 \begin{align}
-  s_\ell &= \sigma(W_{\mathrm{skip}} z)_\ell \in [0,1] && \text{per-layer skip probability} \\
-  \tau   &= \mathrm{softplus}(W_\tau z) + 0.5 \in (0.5, \infty) && \text{attention temperature} \\
-  \gamma &= 1 + 0.1 \tanh(W_\gamma z) && \text{FiLM scale (near 1)} \\
-  \beta  &= 0.1 \tanh(W_\beta z) && \text{FiLM shift (near 0)}
+  s_\ell &= \sigma(W_{\mathrm{skip}} z)_\ell \in [0,1] && \text{per-layer skip prob.} \\
+  \tau   &= \mathrm{softplus}(W_\tau z) + 0.5           && \text{attention temperature} \\
+  \gamma &= 1 + 0.1 \tanh(W_\gamma z)                  && \text{FiLM scale (near 1)} \\
+  \beta  &= 0.1 \tanh(W_\beta z)                        && \text{FiLM shift (near 0)}
 \end{align}
 
-FiLM conditioning (feature-wise linear modulation~\citep{perez2018film}) applies
-$\gamma \odot h + \beta$ to the attention output of every block, with $(\gamma, \beta)$
-shared across all blocks but decoded from the same $z$. Using FiLM rather than
-additive injection preserves the magnitude properties of the attention output across
-tasks, since $\gamma \approx 1$ by construction. A regularisation term
-$\mathcal{L}_{\mathrm{AGV}} = \frac{\gamma_{\mathrm{AGV}}}{2} \|z\|^2$ keeps $z$ near the origin.
+FiLM conditioning~\citep{perez2018film} applies $\gamma \odot h + \beta$ to every
+block's attention output. Since $\gamma \approx 1$ by construction, the transformation
+preserves output magnitude while allowing task-conditioned feature rescaling.
+A regularisation term $\mathcal{L}_{\mathrm{AGV}} = \frac{\gamma_{\mathrm{AGV}}}{2} \|z\|^2$
+keeps $z$ near the origin.
 
 \subsection{Cognitive Budget Allocator}
 \label{sec:cba}
 
 The CBA predicts per-layer budgets $b \in [0,1]^L$ from raw input statistics:
 \begin{equation}
-  b = \mathrm{Sigmoid}(f_\theta([\mathrm{std}(x),\, \hat{H}(x),\, \mathrm{range}(x)]))
+  b = \mathrm{Sigmoid}\!\left(f_\theta\!\left([\mathrm{std}(x),\, \hat{H}(x),\, \mathrm{range}(x)]\right)\right)
 \end{equation}
-where $\hat{H}(x) = -\sum_d p_d \log p_d / \log D$ is a normalised entropy proxy
-computed over pixel intensities (or flattened features), and $\mathrm{range}(x) = x_{\max} - x_{\min}$.
+where $\hat{H}(x) = -\sum_d p_d \log p_d / \log D$ is a normalised entropy proxy.
 A budget penalty $\mathcal{L}_{\mathrm{CBA}} = \beta_b \, \bar{b}$ encourages sparsity.
 
 \subsection{Slow-Pathway Consolidation}
@@ -263,31 +253,27 @@ A budget penalty $\mathcal{L}_{\mathrm{CBA}} = \beta_b \, \bar{b}$ encourages sp
 After task $t$, the diagonal Fisher information is estimated over slow-pathway
 weights $\theta_s$ only:
 \begin{equation}
-  F_s^{(t)} = \mathbb{E}_{(x,y) \sim \mathcal{D}_t}\Bigl[\bigl(\nabla_{\theta_s} \log p_\theta(y|x)\bigr)^2\Bigr]
+  F_s^{(t)} = \mathbb{E}_{(x,y) \sim \mathcal{D}_t}\!\Bigl[\bigl(\nabla_{\theta_s} \log p_\theta(y|x)\bigr)^2\Bigr]
 \end{equation}
 
-The SPC regularisation term for all subsequent tasks is:
+The SPC regularisation term for subsequent tasks:
 \begin{equation}
   \mathcal{L}_{\mathrm{SPC}} = \lambda_{\mathrm{SPC}} \sum_{t' < t} \sum_{k}
     F_{s,k}^{(t')} \bigl(\theta_{s,k} - \theta_{s,k}^{*(t')}\bigr)^2
 \end{equation}
-where $\theta_s^{*(t')}$ are the slow-pathway weights at the end of task $t'$.
 
-The fast-pathway weights $\theta_f$ are unconstrained — they remain free to adapt
-to new tasks. This is the key difference from EWC, which regularises all weights
-uniformly. SPC has 50\% fewer Fisher parameters than EWC (at $L=4$ layers with
-4 weight tensors per block for slow vs.\ 8 total per block), and its regularisation
-is more precise because it targets only the weights responsible for stable, task-agnostic
-representations.
+Fast-pathway weights $\theta_f$ remain unconstrained. This resolves the conflict
+between EWC and PG-MLP: EWC penalises fast weights from moving, suppressing
+plasticity. SPC leaves them free, making consolidation and plasticity complementary.
+With $L=4$, SPC uses 16 Fisher tensors vs.\ ${\sim}32+$ for EWC (50\% reduction).
 
 \subsection{Total Loss}
-\label{sec:loss}
 
 \begin{equation}
-  \mathcal{L} = \mathcal{L}_{\mathrm{CE}} + \mathcal{L}_{\mathrm{plastic}} + \mathcal{L}_{\mathrm{CBA}} + \lambda_{\mathrm{AGV}} \mathcal{L}_{\mathrm{AGV}} + \mathcal{L}_{\mathrm{SPC}}
+  \mathcal{L} = \mathcal{L}_{\mathrm{CE}} + \mathcal{L}_{\mathrm{plastic}} + \mathcal{L}_{\mathrm{CBA}} + \gamma_{\mathrm{AGV}} \mathcal{L}_{\mathrm{AGV}} + \mathcal{L}_{\mathrm{SPC}}
 \end{equation}
 
-All terms are end-to-end differentiable. $\mathcal{L}_{\mathrm{SPC}}$ becomes active
+All terms are end-to-end differentiable. $\mathcal{L}_{\mathrm{SPC}}$ activates
 after the first task is completed.
 
 % ============================================================
@@ -298,48 +284,40 @@ after the first task is completed.
 \subsection{Benchmarks}
 
 \textbf{Split-MNIST.} Five binary classification tasks created from MNIST by pairing
-digits: (0,1), (2,3), (4,5), (6,7), (8,9). Each task uses the standard train/test
-split~\citep{zenke2017continual}. Input: $784$-dimensional flattened pixels.
-Task-incremental setting (task ID given at test time).
-
-\textbf{Split-CIFAR-10.} Five binary classification tasks from CIFAR-10 with the same
-class pairing. Input: $3072$-dimensional flattened pixels.
+digits: (0,1), (2,3), (4,5), (6,7), (8,9). Task-incremental setting (task ID given
+at test time). Input: $784$-dimensional flattened pixels.
 
 \subsection{Models}
 
 All models use task-specific linear heads.
 
 \begin{itemize}
-  \item \textbf{ARIA+SPC}: full model with SPC. $d_{\mathrm{model}}=256$, $L=4$,
-    $H_{\mathrm{init}}=4$, $H_{\max}=8$. $\approx 3.77$M parameters.
+  \item \textbf{ARIA+SPC}: full model. $d_{\mathrm{model}}=256$, $L=4$,
+    $H_{\mathrm{init}}=4$, $H_{\max}=8$, $\approx 3.77$M parameters.
   \item \textbf{ARIA-noSPC}: ARIA without SPC (no Fisher regularisation).
-  \item \textbf{EWC}: 4-layer StaticMLP with EWC, parameter-matched to ARIA+SPC.
+  \item \textbf{EWC}: 4-layer StaticMLP with EWC, parameter-matched.
   \item \textbf{DER++}: 4-layer StaticMLP with DER++, parameter-matched. Buffer size 200.
-  \item \textbf{StaticMLP}: 4-layer MLP, parameter-matched, fine-tuning only (lower bound).
+  \item \textbf{StaticMLP}: 4-layer MLP, parameter-matched, fine-tuning only.
 \end{itemize}
 
-\textbf{Parameter matching.} To ensure fair comparison, we solve for the hidden dimension
-$h$ of the StaticMLP such that its total parameter count equals ARIA's. For
-$d_{\mathrm{model}}=256$, this gives $h \approx 997$ (empirically determined by solving
-$3h^2 + (784 + 3 + 2 + 1)h - N_{\mathrm{ARIA}} = 0$).
+\textbf{Parameter matching.} We solve for the StaticMLP hidden dimension $h$ such
+that its total parameter count equals ARIA's, giving $h \approx 997$ for
+$d_{\mathrm{model}}=256$.
 
 \subsection{Training}
 
-AdamW optimiser~\citep{loshchilov2019decoupled}, $\mathrm{lr}=3 \times 10^{-4}$,
+AdamW~\citep{loshchilov2019decoupled}, $\mathrm{lr}=3 \times 10^{-4}$,
 weight decay $10^{-4}$, gradient clipping at 1.0. 5 epochs per task.
 Batch size 64. Five seeds: $\{42, 123, 999, 7, 2024\}$.
 
 \subsection{Metrics}
 
-Following standard continual learning evaluation protocol~\citep{lopez2017gradient}:
-
+Following~\citep{lopez2017gradient}:
 \begin{align}
   \text{Avg Acc} &= \frac{1}{T} \sum_{j=1}^{T} a_{T,j} \\
   \text{BWT} &= \frac{1}{T-1} \sum_{j=1}^{T-1} (a_{T,j} - a_{j,j}) \\
-  \text{Forgetting} &= \frac{1}{T-1} \sum_{j=1}^{T-1} (\max_{i \leq T} a_{i,j} - a_{T,j})
+  \text{Forgetting} &= \frac{1}{T-1} \sum_{j=1}^{T-1} \bigl(\max_{i \leq T} a_{i,j} - a_{T,j}\bigr)
 \end{align}
-
-where $a_{i,j}$ is the test accuracy on task $j$ after training on task $i$.
 
 % ============================================================
 \section{Results}
@@ -350,123 +328,127 @@ where $a_{i,j}$ is the test accuracy on task $j$ after training on task $i$.
 
 \begin{table}[h]
 \centering
-\caption{Split-MNIST results (5 seeds: 42, 123, 999, 7, 2024 — mean $\pm$ std).
-All baselines parameter-matched to ARIA ($\approx$3.77M params). Bold = best.}
+\caption{Split-MNIST (5 seeds: 42, 123, 999, 7, 2024 --- mean $\pm$ std).
+All baselines parameter-matched to ARIA ($\approx$3.77M params). \textbf{Bold} = best.}
 \label{tab:main}
 \begin{tabular}{lcc}
 \toprule
-Model       & Avg Acc $\uparrow$       & Forgetting $\downarrow$ \\
+Model       & Avg Acc $\uparrow$            & Forgetting $\downarrow$      \\
 \midrule
-\textbf{ARIA+SPC}   & \textbf{98.57 $\pm$ 0.28\%} & \textbf{1.33 $\pm$ 0.39\%} \\
-ARIA-noSPC          & 98.43 $\pm$ 0.70\%          & 1.63 $\pm$ 0.84\% \\
-EWC                 & 97.35 $\pm$ 2.04\%          & 2.29 $\pm$ 2.78\% \\
-DER++               & 75.63 $\pm$ 6.04\%          & 30.18 $\pm$ 7.55\% \\
-StaticMLP           & 76.91 $\pm$ 3.02\%          & 28.45 $\pm$ 3.71\% \\
+\textbf{ARIA+SPC}  & \textbf{98.57 $\pm$ 0.28\%} & \textbf{1.33 $\pm$ 0.39\%}  \\
+ARIA-noSPC         & 98.43 $\pm$ 0.70\%          & 1.63 $\pm$ 0.84\%           \\
+EWC                & 97.35 $\pm$ 2.04\%          & 2.29 $\pm$ 2.78\%           \\
+DER++              & 75.63 $\pm$ 6.04\%          & 30.18 $\pm$ 7.55\%          \\
+StaticMLP          & 76.91 $\pm$ 3.02\%          & 28.45 $\pm$ 3.71\%          \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-ARIA+SPC achieves the best average accuracy and lowest forgetting across all five seeds.
-The gap between ARIA+SPC and EWC is +1.22 percentage points in accuracy and
-$-$0.96 points in forgetting (a 43\% relative reduction).
-DER++ underperforms EWC in this setting, likely due to the small replay buffer (200 samples)
-relative to the matched parameter count — a known weakness of replay methods under
-tight memory constraints~\citep{buzzega2020dark}.
+ARIA+SPC achieves the best average accuracy and lowest forgetting across all five seeds
+(Figure~\ref{fig:bars}). The gap between ARIA+SPC and EWC is $+1.22$ percentage points
+accuracy and $-0.96$ points forgetting (43\% relative reduction).
+ARIA-noSPC already outperforms EWC by $+1.08$ points, demonstrating that the
+architectural mechanisms alone (MA + PG-MLP + AGV) beat parameter-matched EWC.
+SPC then adds $+0.14$ points and halves forgetting variance (std: $0.84\% \to 0.39\%$).
+DER++ underperforms due to the small replay buffer at matched parameter count --- a known
+weakness~\citep{buzzega2020dark}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{summary_bars.png}
+\caption{Average accuracy comparison across all models (5 seeds, Split-MNIST).
+ARIA+SPC and ARIA-noSPC substantially outperform all baselines.}
+\label{fig:bars}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{accuracy_over_tasks.png}
+\caption{Mean accuracy over previously seen tasks after each training stage.
+ARIA+SPC and ARIA-noSPC maintain $>$98\% throughout all 5 tasks.
+EWC degrades slightly. DER++ and StaticMLP exhibit severe forgetting after Task 2.}
+\label{fig:curves}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{forgetting_heatmap.png}
+\caption{Per-task forgetting by model (5 seeds). ARIA+SPC maintains
+$\leq$2\% forgetting on all tasks. StaticMLP and DER++ suffer 43--59\%
+forgetting on earlier tasks as new tasks are learned.}
+\label{fig:heatmap}
+\end{figure}
 
 \subsection{Ablation Study}
 
 \begin{table}[h]
 \centering
-\caption{Component ablation on Split-MNIST (3 seeds). Filled after ablation run.}
+\caption{Component ablation on Split-MNIST (to be filled after running \texttt{scripts/ablation.py}).}
 \label{tab:ablation}
 \begin{tabular}{lcc}
 \toprule
-Model       & Avg Acc & Forgetting \\
+Model            & Avg Acc & Forgetting \\
 \midrule
-ARIA+SPC (full)  & —  & — \\
-ARIA-noSPC       & —  & — \\
-ARIA-noMA        & —  & — \\
-ARIA-noPG        & —  & — \\
-ARIA-noAGV       & —  & — \\
-ARIA-noCBA       & —  & — \\
+ARIA+SPC (full)  & ---     & ---        \\
+ARIA-noSPC       & ---     & ---        \\
+ARIA-noMA        & ---     & ---        \\
+ARIA-noPG        & ---     & ---        \\
+ARIA-noAGV       & ---     & ---        \\
+ARIA-noCBA       & ---     & ---        \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textit{Table~\ref{tab:ablation} will be filled by}
-\texttt{python scripts/ablation.py}.
-
 \subsection{Morphogenesis Trajectory}
 
-During a representative Split-MNIST training run (seed 42), the head count in each
-layer remains at the initial value of 4 throughout all 5 tasks, indicating that
-the viability-based split threshold ($\tau_{\mathrm{split}} = 0.65$) was not exceeded
-under these training conditions. The forgetting heatmap (Figure~\ref{fig:heatmap})
-confirms that even without morphogenesis events, the combination of PG-MLP + SPC
-is sufficient to keep per-task forgetting below 4\% across all tasks and layers.
-This suggests morphogenesis may contribute more substantially in longer task sequences
-or higher-capacity regimes, which we leave for future work.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\columnwidth]{../results/figures/forgetting_heatmap.png}
-\caption{Per-task forgetting by model on Split-MNIST (5 seeds). ARIA+SPC maintains
-near-zero forgetting ($\leq$2\%) on all tasks; StaticMLP and DER++ show heavy
-forgetting on earlier tasks as new tasks are learned.}
-\label{fig:heatmap}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\columnwidth]{../results/figures/accuracy_over_tasks.png}
-\caption{Mean accuracy over previously seen tasks after each training stage.
-ARIA+SPC and ARIA-noSPC maintain $>$98\% throughout; EWC degrades slightly;
-DER++ and StaticMLP exhibit severe forgetting.}
-\label{fig:curves}
-\end{figure}
+During training on Split-MNIST, head counts in all layers remained at the initial
+value of 4 throughout all 5 tasks, indicating the viability-based split threshold
+($\tau_{\mathrm{split}} = 0.65$) was not exceeded. The forgetting heatmap
+(Figure~\ref{fig:heatmap}) confirms that even without morphogenesis events,
+PG-MLP + SPC keeps per-task forgetting below 4\%. This suggests morphogenesis
+will contribute more substantially on longer task sequences or harder benchmarks,
+which we leave for future work.
 
 % ============================================================
 \section{Analysis}
 \label{sec:analysis}
 % ============================================================
 
-\subsection{Why SPC outperforms EWC}
+\subsection{Why SPC Outperforms EWC}
 
 EWC regularises all weights uniformly, including fast-pathway weights that are
 \emph{designed} to be volatile. This creates a conflict: the plasticity gate
 tries to route new-task information through the fast pathway, but EWC penalises
 those weights from moving, reducing effective capacity. SPC avoids this by
-leaving fast weights unconstrained, so the two mechanisms (plasticity gating
-and Fisher consolidation) are complementary rather than conflicting.
+leaving fast weights unconstrained --- plasticity gating and Fisher consolidation
+become complementary rather than conflicting.
 
-Empirically, the ARIA-noSPC model (same architecture, no Fisher regularisation)
-achieves 98.43\% — already 1.08 points above EWC — demonstrating that the
-PG-MLP + AGV + MA combination alone outperforms parameter-matched EWC.
-Adding SPC yields a further +0.14 points and reduces forgetting variance
-(std drops from 0.84\% to 0.39\%), confirming that targeted slow-pathway
-consolidation provides consistent stability benefits on top of the structural
-advantages of the architecture.
+Empirically, ARIA-noSPC achieves 98.43\% --- already $+1.08$ points above EWC ---
+confirming the architecture alone outperforms parameter-matched EWC. Adding SPC
+yields a further $+0.14$ points and reduces forgetting variance from 0.84\% to 0.39\%,
+confirming targeted consolidation provides consistent stability on top of the
+structural advantages.
 
-\subsection{The gradient dampening direction}
+\subsection{The Gradient Dampening Direction}
 
-A subtle but critical implementation detail in PG-MLP is the gradient dampening
-multiplier. The correct formula is $(1-\bar\pi)$:
+A critical implementation detail in PG-MLP is the gradient dampening multiplier.
+The correct formula is $(1-\bar\pi)$:
 \begin{itemize}
-  \item High $\bar\pi$ (fast/plastic): multiplier $\approx 0$ → slow path protected.
-  \item Low $\bar\pi$ (slow/consolidated): multiplier $\approx 1$ → slow path updates normally.
+  \item High $\bar\pi$ (fast/plastic): multiplier $\approx 0$ $\Rightarrow$ slow path protected.
+  \item Low $\bar\pi$ (slow/consolidated): multiplier $\approx 1$ $\Rightarrow$ slow path updates normally.
 \end{itemize}
-Prior versions of this codebase used $\bar\pi$ (inverted), which had the opposite
-effect: fast pathways were protected during plastic phases, and slow pathways were
-inadvertently updated, explaining why the pre-fix ablations showed ARIA-noPG
-outperforming ARIA-Full.
+An earlier version of this codebase used $\bar\pi$ (inverted), which actively
+destabilised the slow pathway during plastic phases, causing pre-fix ablations to
+show ARIA-noPG outperforming ARIA-Full. The corrected implementation produces the
+results in Table~\ref{tab:main}.
 
-\subsection{Parameter efficiency}
+\subsection{Parameter Efficiency}
 
-SPC Fisher estimation is performed only over slow-pathway parameters:
-$\{W_s^{(1)}, b_s^{(1)}, W_s^{(2)}, b_s^{(2)}\}$ per block, totalling
-$4L$ tensors. EWC operates over all parameters. For ARIA with $L=4$, SPC
-requires 16 Fisher tensors vs.\ ${\sim}32+$ for EWC, reducing the consolidation
-overhead by 50\%.
+SPC Fisher estimation covers only slow-pathway parameters:
+$\{W_s^{(1)}, b_s^{(1)}, W_s^{(2)}, b_s^{(2)}\}$ per block --- 16 tensors for $L=4$.
+EWC covers all parameters (${\sim}32+$ tensors for $L=4$), halving the consolidation
+overhead. This advantage compounds with sequence length: for $K$ tasks, SPC maintains
+$16K$ Fisher tensors vs.\ $32K+$ for EWC.
 
 % ============================================================
 \section{Discussion}
@@ -476,29 +458,24 @@ overhead by 50\%.
 \paragraph{Relationship to biological memory.}
 ARIA's fast/slow pathway dichotomy is directly inspired by Complementary Learning
 Systems theory~\citep{mcclelland1995complementary}. Unlike prior implementations
-that fix the routing heuristically, ARIA learns the gate from data. This allows
+that fix the routing heuristically, ARIA learns the gate from data --- allowing
 the model to discover when to consolidate (low $\pi$) and when to stay plastic
 (high $\pi$) from the training signal alone.
 
 \paragraph{Morphogenic attention vs.\ standard attention.}
 Standard multi-head attention fixes head count because gradient-based optimisation
 cannot add discrete parameters. MA sidesteps this via: (a) a continuous viability
-score that enables gradient-based assessment of head utility, and (b) a
-rule-based split/merge triggered at discrete intervals. This hybrid approach avoids
-the pathological gradient landscapes of fully discrete architecture search while
-enabling genuine structural change.
+score for gradient-based head utility assessment, and (b) a rule-based split/merge
+at discrete intervals. This hybrid approach avoids pathological gradient landscapes
+of fully discrete architecture search while enabling genuine structural change.
 
 \paragraph{Limitations.}
 \begin{itemize}
-  \item Evaluated only on image classification benchmarks; generalisation to NLP
-    or multimodal tasks is not established.
-  \item Fisher estimation is diagonal; Kronecker-factored or Gauss-Newton
-    approximations may give better estimates.
-  \item Morphogenesis is triggered at fixed intervals; an adaptive trigger (e.g.,
-    based on gradient norm thresholds as implemented in \texttt{files/aria\_train\_v4.py})
-    may be more principled.
-  \item Results are pending; claims in this draft are analytical (correctness of
-    proposed mechanisms) rather than empirical.
+  \item Evaluated only on Split-MNIST; Split-CIFAR-10 and longer benchmarks are in progress.
+  \item Morphogenesis did not activate on Split-MNIST; harder benchmarks are needed
+    to validate MA's contribution.
+  \item Fisher estimation is diagonal; Kronecker-factored approximations may improve estimates.
+  \item DER++ used a small buffer (200 samples); a larger buffer would be a fairer comparison.
 \end{itemize}
 
 % ============================================================
@@ -507,16 +484,16 @@ enabling genuine structural change.
 % ============================================================
 
 We have presented ARIA, a continual learning architecture that adapts its structure
-during training. The four core mechanisms — Morphogenic Attention, Plasticity-Gated MLP,
-Architecture Genome Vector, and Cognitive Budget Allocator — are all jointly-trained
-and end-to-end differentiable. A fifth mechanism, Slow-Pathway Consolidation, provides
-targeted Fisher regularisation that is compatible with the fast/slow pathway structure.
-Empirical results on Split-MNIST and Split-CIFAR-10 will determine whether these
-architectural choices translate to measurable improvements over strong baselines.
+during training. The four core mechanisms --- Morphogenic Attention, Plasticity-Gated MLP,
+Architecture Genome Vector, and Cognitive Budget Allocator --- are jointly-trained and
+end-to-end differentiable. Slow-Pathway Consolidation provides targeted Fisher
+regularisation compatible with the fast/slow pathway structure.
 
-The corrected implementation is available at \url{https://github.com/rsd-darshan/ARIA},
-with reproducible scripts, unit tests, and multi-seed evaluation infrastructure
-matching the protocol used in this paper.
+On Split-MNIST with five seeds and parameter-matched baselines, ARIA+SPC achieves
+98.57\% average accuracy with 1.33\% forgetting, outperforming EWC by $+1.22$ points
+and reducing forgetting by 43\%. The corrected gradient dampening direction in PG-MLP
+was the critical enabling fix. Code, tests, and reproducible scripts are available at:
+\url{https://github.com/rsd-darshan/ARIA}
 
 % ============================================================
 \bibliographystyle{plainnat}

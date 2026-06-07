@@ -9,7 +9,7 @@ description = "ARIA — Adaptive Recurrent Intelligence Architecture for continu
 readme      = "README.md"
 requires-python = ">=3.9"
 license     = {text = "MIT"}
-authors     = [{name = "Darshan Poudel", email = "susanpdl77@gmail.com"}]
+authors     = [{name = "Darshan Poudel", email = "poudeldarshan44@gmail.com"}]
 keywords    = ["continual learning", "catastrophic forgetting", "attention", "plasticity"]
 classifiers = [
     "Development Status :: 3 - Alpha",
