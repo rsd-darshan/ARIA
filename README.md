@@ -16,6 +16,26 @@ Catastrophic forgetting remains one of the hardest problems in deep learning. St
 
 ---
 
+## ARIA vs NCG
+
+ARIA is a separate project from [NCG (Novelty-triggered Capacity Growth)](https://github.com/rsd-darshan/NCG), which also addresses catastrophic forgetting. Here is how they differ:
+
+| | NCG | ARIA |
+|---|---|---|
+| **Core idea** | Grow capacity (+64 units) when novelty is low and accuracy plateaus | Restructure attention heads and route through fast/slow pathways |
+| **Architecture** | Simple 2-layer MLP with expandable hidden units | 4-layer transformer-style with MA, PG-MLP, AGV, CBA |
+| **Forgetting strategy** | Capacity growth + gated knowledge buffer | Slow-pathway Fisher consolidation (SPC) |
+| **Meta-learning** | Lagrangian meta-parameters α, β, λ learned online | Architecture genome vector z co-optimised with weights |
+| **Result vs EWC (Split-MNIST)** | NCG 55.1% vs EWC 73.2% — **EWC wins** | ARIA 98.6% vs EWC 97.4% — **ARIA wins** |
+| **Forgetting (Split-MNIST)** | 33.1% | **1.3%** |
+| **Novel mechanism** | Growth trigger policy | Morphogenic Attention + SPC |
+
+**Key distinction:** NCG asks *when* to grow. ARIA asks *how* to structure learning so growth is unnecessary — plasticity and stability are balanced inside the architecture itself, not by adding parameters reactively.
+
+Both projects are by the same author and tackle the same problem from fundamentally different angles. NCG is simpler and more interpretable; ARIA is more expressive and more effective.
+
+---
+
 ## Core Mechanisms
 
 ARIA combines four differentiable mechanisms and one post-training consolidation step:
