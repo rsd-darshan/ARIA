@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data — large datasets (download on demand)
+data/
+
+# Training artifacts — results kept in results/ but raw dumps excluded
+results/raw_matrices.npy
+results/*/checkpoints/
+results_cifar10/raw_matrices.npy
+*.pt
+*.pth
+*.pkl
+
+# Logs
+*.log
+runs/
+wandb/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Paper build
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk

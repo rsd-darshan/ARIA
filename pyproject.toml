@@ -1,0 +1,40 @@
+[build-system]
+requires      = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name        = "aria-cl"
+version     = "1.0.0"
+description = "ARIA — Adaptive Recurrent Intelligence Architecture for continual learning"
+readme      = "README.md"
+requires-python = ">=3.9"
+license     = {text = "MIT"}
+authors     = [{name = "Darshan Poudel", email = "susanpdl77@gmail.com"}]
+keywords    = ["continual learning", "catastrophic forgetting", "attention", "plasticity"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "numpy>=1.24",
+    "matplotlib>=3.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[project.urls]
+Homepage   = "https://github.com/rsd-darshan/ARIA"
+Repository = "https://github.com/rsd-darshan/ARIA"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers   = ["integration: marks tests requiring dataset downloads (deselect with -m 'not integration')"]
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "scripts*", "examples*", "paper*", "results*"]
