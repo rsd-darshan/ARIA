@@ -107,15 +107,20 @@ def make_aria_noAGV(cfg: ARIAConfig, device: torch.device) -> ARIA:
             super().__init__()
             self.L = cfg.n_layers
             self.D = cfg.d_model
+            # register as buffers so .to(device) moves them automatically
+            self.register_buffer("_skip",  torch.zeros(self.L))
+            self.register_buffer("_temp",  torch.ones(1))
+            self.register_buffer("_scale", torch.ones(self.D))
+            self.register_buffer("_shift", torch.zeros(self.D))
         def decode(self):
             return {
-                "skip_probs":  torch.zeros(self.L),
-                "temperature": torch.ones(1).squeeze(),
-                "film_scale":  torch.ones(self.D),
-                "film_shift":  torch.zeros(self.D),
+                "skip_probs":  self._skip,
+                "temperature": self._temp.squeeze(),
+                "film_scale":  self._scale,
+                "film_shift":  self._shift,
             }
         def reg_loss(self):
-            return torch.zeros(1).squeeze()
+            return self._skip.sum() * 0.0
 
     m.genome = _FixedGenome(cfg)
     return m.to(device)
