@@ -120,6 +120,18 @@ HAT~\citep{serra2018overcoming} learns binary task masks. None dynamically restr
 DEN~\citep{yoon2018lifelong} expands hidden units based on a drift threshold ---
 closest to ARIA in spirit, but operates at the unit level without attention or plasticity gating.
 
+\paragraph{Novelty-triggered Capacity Growth (NCG).}
+NCG~\citep{poudel2025ncg} is a prior architecture by the same author that addresses
+catastrophic forgetting via reactive capacity expansion: a 2-layer MLP with expandable
+hidden units adds 64 neurons when novelty is low and accuracy plateaus, regulated by
+online Lagrangian meta-parameters $\alpha$, $\beta$, $\lambda$. On Split-MNIST, NCG
+achieves 55.1\% average accuracy, falling below EWC (73.2\%), because growth is
+triggered too infrequently on short task sequences and the base model has limited
+representational depth. ARIA draws a different conclusion from NCG's failure: instead
+of asking \emph{when} to grow capacity, ARIA asks \emph{how} to structure learning so
+that growth is unnecessary --- plasticity and stability are balanced inside the
+architecture itself through PG-MLP gating and targeted SPC regularisation.
+
 \paragraph{Complementary learning systems.}
 The biological motivation for fast/slow pathways comes from CLS theory~\citep{mcclelland1995complementary},
 which posits that the hippocampus (fast, volatile) and neocortex (slow, consolidated)
@@ -498,6 +510,12 @@ was the critical enabling fix. Code, tests, and reproducible scripts are availab
 % ============================================================
 \bibliographystyle{plainnat}
 \begin{thebibliography}{99}
+
+\bibitem[Poudel(2025)]{poudel2025ncg}
+Poudel, D.
+NCG: Novelty-triggered Capacity Growth for continual learning.
+\emph{arXiv preprint}, 2025.
+\url{https://github.com/rsd-darshan/NCG}
 
 \bibitem[Buzzega et al.(2020)]{buzzega2020dark}
 Buzzega, P., Boschini, M., Porrello, A., Abati, D., and Calderara, S.
