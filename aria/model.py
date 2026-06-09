@@ -45,6 +45,9 @@ class ARIAConfig:
     spc_lambda:        float = 5000.0
     genome_gamma:      float = 0.0001
     budget_beta:       float = 0.001
+    # ARIA-v2 additions
+    spad_lambda:       float = 50.0   # SPAD: L2 anchor on slow pathway weights
+    slow_lr_ratio:     float = 0.1    # asymmetric LR: slow params get lr * slow_lr_ratio
 
 
 # ---------------------------------------------------------------------------
@@ -248,8 +251,14 @@ class PlasticityGatedMLP(nn.Module):
         self.warmup_steps = cfg.warmup_steps
         self.mean_gate    = 0.5
 
-    def forward(self, x: torch.Tensor, step: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        π = self.gate_net(x)
+    def forward(
+        self, x: torch.Tensor, step: int, force_slow: bool = False
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if force_slow:
+            # task-conditioned gate: old tasks route entirely through consolidated slow pathway
+            π = torch.zeros(*x.shape[:-1], 1, device=x.device)
+        else:
+            π = self.gate_net(x)
         self.mean_gate = float(π.detach().mean().item())
 
         h_fast = F.gelu(self.fast_in(x))
@@ -315,10 +324,11 @@ class ARIABlock(nn.Module):
         self.mlp  = PlasticityGatedMLP(cfg)
 
     def forward(
-        self, x: torch.Tensor, genome: Dict, budget: torch.Tensor, step: int
+        self, x: torch.Tensor, genome: Dict, budget: torch.Tensor, step: int,
+        force_slow: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         z     = self.attn(self.ln1(x), genome) + x
-        h, pl = self.mlp(self.ln2(z), step)
+        h, pl = self.mlp(self.ln2(z), step, force_slow=force_slow)
         b     = budget[self.idx]
         return b * (z + h) + (1 - b) * x, pl
 
@@ -369,9 +379,11 @@ class ARIA(nn.Module):
 
         self._spc_means:   List[Dict[str, torch.Tensor]] = []
         self._spc_fishers: List[Dict[str, torch.Tensor]] = []
+        self._slow_snapshot: Dict[str, torch.Tensor] = {}  # SPAD: frozen post-consolidation slow weights
 
-        self.global_step  = 0
-        self.n_tasks_seen = 0
+        self.global_step    = 0
+        self.n_tasks_seen   = 0
+        self.current_task_id = 0  # updated by train loop; used for task-conditioned gate routing
 
     # ------------------------------------------------------------------
     # Task heads
@@ -395,12 +407,15 @@ class ARIA(nn.Module):
         genome          = self.genome.decode()
         total_p         = torch.zeros(1, device=device).squeeze()
 
+        # task-conditioned gate: at eval time, route old tasks through slow pathway only
+        force_slow = (not self.training) and (task_id < self.current_task_id)
+
         for block in self.blocks:
             if self.training:
                 if torch.rand(1).item() < genome["skip_probs"][block.idx].item() * 0.1:
                     continue
-            h, p     = block(h, genome, budgets, self.global_step)
-            total_p  = total_p + p
+            h, p    = block(h, genome, budgets, self.global_step, force_slow=force_slow)
+            total_p = total_p + p
 
         h   = self.ln_f(h).squeeze(1)
         out = self.task_heads[task_id](h)
@@ -413,7 +428,8 @@ class ARIA(nn.Module):
 
         aux = (total_p + b_loss
                + self.cfg.genome_gamma * self.genome.reg_loss()
-               + self._spc_loss(device))
+               + self._spc_loss(device)
+               + self._spad_loss(device))
         return out, aux
 
     # ------------------------------------------------------------------
@@ -474,7 +490,36 @@ class ARIA(nn.Module):
 
         self._spc_means.append(means)
         self._spc_fishers.append(fishers)
+        self.snapshot_slow()  # SPAD: freeze post-consolidation slow weights
         self.train()
+
+    # ------------------------------------------------------------------
+    # SPAD — Slow-Pathway Activation Distillation (ARIA-v2)
+    # ------------------------------------------------------------------
+
+    def slow_parameters(self) -> List[nn.Parameter]:
+        """All slow-pathway parameters across all blocks, for asymmetric LR."""
+        params: List[nn.Parameter] = []
+        for block in self.blocks:
+            params.extend(block.mlp.slow_parameters())
+        return params
+
+    def snapshot_slow(self) -> None:
+        """Store frozen copy of current slow weights. Called after each consolidation."""
+        self._slow_snapshot = {
+            n: p.detach().cpu().clone() for n, p in self._slow_named_params()
+        }
+
+    def _spad_loss(self, device: torch.device) -> torch.Tensor:
+        """L2 distance from current slow weights to their post-consolidation snapshot.
+        Prevents slow pathway from drifting while learning new tasks."""
+        if not self._slow_snapshot:
+            return torch.zeros(1, device=device).squeeze()
+        loss = torch.zeros(1, device=device).squeeze()
+        for name, param in self._slow_named_params():
+            if name in self._slow_snapshot:
+                loss = loss + ((param - self._slow_snapshot[name].to(device)) ** 2).sum()
+        return self.cfg.spad_lambda * loss
 
     # ------------------------------------------------------------------
     # Gradient dampening — must call after loss.backward()

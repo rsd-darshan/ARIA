@@ -91,15 +91,22 @@ def train_aria(
     acc_matrix : (T, T) array where acc_matrix[i, j] = accuracy on task j
                  evaluated after training on task i.
     """
-    T       = len(tasks)
-    model   = ARIA(cfg).to(device)
+    T     = len(tasks)
+    model = ARIA(cfg).to(device)
     for _ in range(T):
         model.add_task_head(device, n_classes=cfg.n_classes)
 
-    opt     = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-    matrix  = np.zeros((T, T))
+    # asymmetric LR: slow pathway at slow_lr_ratio × base lr
+    slow_ids    = {id(p) for p in model.slow_parameters()}
+    param_groups = [
+        {"params": [p for p in model.parameters() if id(p) not in slow_ids], "lr": lr},
+        {"params": [p for p in model.parameters() if id(p) in slow_ids],     "lr": lr * cfg.slow_lr_ratio},
+    ]
+    opt    = torch.optim.AdamW(param_groups, weight_decay=1e-4)
+    matrix = np.zeros((T, T))
 
     for t, (tr_loader, _) in enumerate(tasks):
+        model.current_task_id = t  # task-conditioned gate routing
         if verbose:
             print(f"  Task {t+1}/{T}  heads={model.architecture_state()['head_counts']}")
 
@@ -115,7 +122,8 @@ def train_aria(
                 opt.step()
 
         if use_spc and t < T - 1:
-            model.consolidate_slow(tr_loader, t, device)
+            model.consolidate_slow(tr_loader, t, device)  # also calls snapshot_slow internally
+        model.current_task_id = t + 1  # advance after task finishes
 
         for j, (_, te_loader) in enumerate(tasks[:t + 1]):
             matrix[t, j] = evaluate(model, te_loader, j, device)
