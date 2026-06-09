@@ -299,6 +299,10 @@ after the first task is completed.
 digits: (0,1), (2,3), (4,5), (6,7), (8,9). Task-incremental setting (task ID given
 at test time). Input: $784$-dimensional flattened pixels.
 
+\textbf{Split-CIFAR-10.} Five binary classification tasks from CIFAR-10, pairing
+classes: (0,1), (2,3), (4,5), (6,7), (8,9). Task-incremental setting. Input:
+$3072$-dimensional flattened pixels (32$\times$32$\times$3).
+
 \subsection{Models}
 
 All models use task-specific linear heads.
@@ -395,21 +399,51 @@ forgetting on earlier tasks as new tasks are learned.}
 
 \begin{table}[h]
 \centering
-\caption{Component ablation on Split-MNIST (to be filled after running \texttt{scripts/ablation.py}).}
+\caption{Component ablation on Split-MNIST (3 seeds: 42, 123, 999). Each row removes one mechanism from ARIA+SPC.}
 \label{tab:ablation}
 \begin{tabular}{lcc}
 \toprule
-Model            & Avg Acc & Forgetting \\
+Model            & Avg Acc $\uparrow$          & Forgetting $\downarrow$     \\
 \midrule
-ARIA+SPC (full)  & ---     & ---        \\
-ARIA-noSPC       & ---     & ---        \\
-ARIA-noMA        & ---     & ---        \\
-ARIA-noPG        & ---     & ---        \\
-ARIA-noAGV       & ---     & ---        \\
-ARIA-noCBA       & ---     & ---        \\
+\textbf{ARIA+SPC (full)} & \textbf{98.48 $\pm$ 0.27\%} & \textbf{1.48 $\pm$ 0.41\%} \\
+ARIA-noSPC       & 98.23 $\pm$ 0.85\%          & 1.86 $\pm$ 1.03\%          \\
+ARIA-noMA        & 98.48 $\pm$ 0.27\%          & 1.48 $\pm$ 0.41\%          \\
+ARIA-noPG        & 97.70 $\pm$ 0.74\%          & 2.47 $\pm$ 0.92\%          \\
+ARIA-noAGV       & 96.15 $\pm$ 1.92\%          & 4.42 $\pm$ 2.43\%          \\
+ARIA-noCBA       & 89.02 $\pm$ 3.87\%          & 13.34 $\pm$ 4.83\%         \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\columnwidth]{ablation_waterfall.png}
+\caption{Ablation waterfall: incremental contribution of each component. CBA and AGV account for the largest performance drops when removed.}
+\label{fig:ablation}
+\end{figure}
+
+The largest single-component contribution is CBA: removing it causes forgetting to jump from 1.48\% to 13.34\% (9$\times$), revealing that per-layer compute gating is critical for preventing representational collapse across tasks. AGV removal causes the second-largest drop (4.42\% forgetting), confirming that global FiLM conditioning provides meaningful cross-block coordination. PG-MLP removal degrades accuracy by $-0.78$ points and increases forgetting by $+0.99$ points. Notably, ARIA-noMA $=$ ARIA+SPC exactly, because MA never fired on Split-MNIST (viability threshold $\tau_{\mathrm{split}} = 0.65$ was not exceeded) --- these two models are therefore functionally identical on this benchmark.
+
+\subsection{Split-CIFAR-10}
+
+\begin{table}[h]
+\centering
+\caption{Split-CIFAR-10 (5 seeds: 42, 123, 999, 7, 2024 --- mean $\pm$ std). 10 epochs per task. \textbf{Bold} = best.}
+\label{tab:cifar}
+\begin{tabular}{lcc}
+\toprule
+Model           & Avg Acc $\uparrow$           & Forgetting $\downarrow$     \\
+\midrule
+\textbf{EWC}    & \textbf{78.92 $\pm$ 0.57\%} & \textbf{0.05 $\pm$ 0.03\%} \\
+ARIA+SPC        & 75.11 $\pm$ 0.34\%          & 12.28 $\pm$ 0.73\%         \\
+ARIA-noSPC      & 75.17 $\pm$ 1.30\%          & 11.96 $\pm$ 1.81\%         \\
+StaticMLP       & 73.95 $\pm$ 0.35\%          & 13.51 $\pm$ 0.54\%         \\
+DER++           & 69.63 $\pm$ 0.76\%          & 19.72 $\pm$ 1.13\%         \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On Split-CIFAR-10, EWC outperforms ARIA+SPC by $+3.81$ points accuracy and nearly eliminates forgetting (0.05\% vs 12.28\%). Notably, ARIA-noSPC $\approx$ ARIA+SPC ($\Delta = -0.06$ points), meaning SPC provides no benefit here --- consistent with EWC's strong performance, which suggests the bottleneck is forward transfer and representational capacity rather than consolidation. We attribute EWC's advantage to two factors: (1) CIFAR-10's higher inter-class similarity creates stronger interference, which EWC's global weight protection handles well but ARIA's local gating does not fully suppress; (2) 10 training epochs may be insufficient for ARIA's heavier architecture ($4.35$M params) to converge on harder inputs, while the simpler StaticMLP baseline converges faster. Extended training and architecture tuning on harder benchmarks is left for future work.
 
 \subsection{Morphogenesis Trajectory}
 
@@ -483,11 +517,15 @@ of fully discrete architecture search while enabling genuine structural change.
 
 \paragraph{Limitations.}
 \begin{itemize}
-  \item Evaluated only on Split-MNIST; Split-CIFAR-10 and longer benchmarks are in progress.
-  \item Morphogenesis did not activate on Split-MNIST; harder benchmarks are needed
-    to validate MA's contribution.
-  \item Fisher estimation is diagonal; Kronecker-factored approximations may improve estimates.
-  \item DER++ used a small buffer (200 samples); a larger buffer would be a fairer comparison.
+  \item ARIA underperforms EWC on Split-CIFAR-10; extended training and architecture
+    tuning on harder benchmarks is needed.
+  \item Morphogenesis did not activate on either benchmark; harder or longer task
+    sequences are needed to validate MA's contribution empirically.
+  \item Fisher estimation is diagonal; Kronecker-factored approximations may improve
+    consolidation quality.
+  \item DER++ used a small buffer (200 samples); a larger buffer would be a fairer
+    comparison at matched parameter counts.
+  \item Ablation used 3 seeds; 5-seed ablation would reduce variance estimates.
 \end{itemize}
 
 % ============================================================

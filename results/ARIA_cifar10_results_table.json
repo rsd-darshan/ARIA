@@ -1,0 +1,52 @@
+{
+  "ARIA+SPC": {
+    "avg_acc": {
+      "mean": 0.7511,
+      "std": 0.0034
+    },
+    "forgetting": {
+      "mean": 0.1228,
+      "std": 0.0073
+    }
+  },
+  "ARIA-noSPC": {
+    "avg_acc": {
+      "mean": 0.7517,
+      "std": 0.013
+    },
+    "forgetting": {
+      "mean": 0.1196,
+      "std": 0.0181
+    }
+  },
+  "EWC": {
+    "avg_acc": {
+      "mean": 0.7892,
+      "std": 0.0057
+    },
+    "forgetting": {
+      "mean": 0.0005,
+      "std": 0.0003
+    }
+  },
+  "DER++": {
+    "avg_acc": {
+      "mean": 0.6963,
+      "std": 0.0076
+    },
+    "forgetting": {
+      "mean": 0.1972,
+      "std": 0.0113
+    }
+  },
+  "StaticMLP": {
+    "avg_acc": {
+      "mean": 0.7395,
+      "std": 0.0035
+    },
+    "forgetting": {
+      "mean": 0.1351,
+      "std": 0.0054
+    }
+  }
+}
