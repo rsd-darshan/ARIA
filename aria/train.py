@@ -96,17 +96,20 @@ def train_aria(
     for _ in range(T):
         model.add_task_head(device, n_classes=cfg.n_classes)
 
-    # asymmetric LR: slow pathway at slow_lr_ratio × base lr
-    slow_ids    = {id(p) for p in model.slow_parameters()}
-    param_groups = [
-        {"params": [p for p in model.parameters() if id(p) not in slow_ids], "lr": lr},
-        {"params": [p for p in model.parameters() if id(p) in slow_ids],     "lr": lr * cfg.slow_lr_ratio},
-    ]
-    opt    = torch.optim.AdamW(param_groups, weight_decay=1e-4)
     matrix = np.zeros((T, T))
 
     for t, (tr_loader, _) in enumerate(tasks):
         model.current_task_id = t  # task-conditioned gate routing
+
+        # rebuild optimizer each task — excludes frozen adapter params from previous tasks
+        slow_ids = {id(p) for p in model.slow_parameters()}
+        active_params = [p for p in model.parameters() if p.requires_grad]
+        param_groups = [
+            {"params": [p for p in active_params if id(p) not in slow_ids], "lr": lr},
+            {"params": [p for p in active_params if id(p) in slow_ids],     "lr": lr * cfg.slow_lr_ratio},
+        ]
+        opt = torch.optim.AdamW(param_groups, weight_decay=1e-4)
+
         if verbose:
             print(f"  Task {t+1}/{T}  heads={model.architecture_state()['head_counts']}")
 
@@ -123,6 +126,7 @@ def train_aria(
 
         if use_spc and t < T - 1:
             model.consolidate_slow(tr_loader, t, device)  # also calls snapshot_slow internally
+        model.freeze_task_adapter(t)   # freeze this task's adapter — NCG-inspired
         model.current_task_id = t + 1  # advance after task finishes
 
         for j, (_, te_loader) in enumerate(tasks[:t + 1]):

@@ -47,7 +47,9 @@ class ARIAConfig:
     budget_beta:       float = 0.001
     # ARIA-v2 additions
     spad_lambda:       float = 50.0   # SPAD: L2 anchor on slow pathway weights
-    slow_lr_ratio:     float = 0.1    # asymmetric LR: slow params get lr * slow_lr_ratio
+    slow_lr_ratio:     float = 0.5    # asymmetric LR: slow params get lr * slow_lr_ratio
+    # ARIA-Final additions
+    adapter_dim:       int   = 64     # task-specific fast adapter bottleneck dimension
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +312,28 @@ class CognitiveBudgetAllocator(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# Task-Specific Fast Adapter (ARIA-Final)
+# ---------------------------------------------------------------------------
+
+class TaskFastAdapter(nn.Module):
+    """
+    Per-task bottleneck residual adapter applied to the final representation.
+    Starts as identity (up weights zero-initialised), learns task-specific
+    fast-pathway features. Frozen after task training ends — new tasks never
+    overwrite old task adapters, eliminating a key source of forgetting.
+    """
+    def __init__(self, d_model: int, adapter_dim: int):
+        super().__init__()
+        self.down = nn.Linear(d_model, adapter_dim)
+        self.up   = nn.Linear(adapter_dim, d_model)
+        nn.init.zeros_(self.up.weight)
+        nn.init.zeros_(self.up.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x + self.up(F.relu(self.down(x)))
+
+
+# ---------------------------------------------------------------------------
 # ARIA Block
 # ---------------------------------------------------------------------------
 
@@ -375,7 +399,8 @@ class ARIA(nn.Module):
         self.blocks     = nn.ModuleList([ARIABlock(cfg, i) for i in range(cfg.n_layers)])
         self.cba        = CognitiveBudgetAllocator(cfg)
         self.ln_f       = nn.LayerNorm(D)
-        self.task_heads: nn.ModuleList = nn.ModuleList()
+        self.task_heads:    nn.ModuleList = nn.ModuleList()
+        self.fast_adapters: nn.ModuleList = nn.ModuleList()
 
         self._spc_means:   List[Dict[str, torch.Tensor]] = []
         self._spc_fishers: List[Dict[str, torch.Tensor]] = []
@@ -392,6 +417,9 @@ class ARIA(nn.Module):
     def add_task_head(self, device: torch.device, n_classes: Optional[int] = None) -> None:
         nc = n_classes if n_classes is not None else self.cfg.n_classes
         self.task_heads.append(nn.Linear(self.cfg.d_model, nc).to(device))
+        self.fast_adapters.append(
+            TaskFastAdapter(self.cfg.d_model, self.cfg.adapter_dim).to(device)
+        )
         self.n_tasks_seen += 1
 
     # ------------------------------------------------------------------
@@ -418,6 +446,7 @@ class ARIA(nn.Module):
             total_p = total_p + p
 
         h   = self.ln_f(h).squeeze(1)
+        h   = self.fast_adapters[task_id](h)  # task-specific adapter (frozen for old tasks)
         out = self.task_heads[task_id](h)
 
         if self.training:
@@ -503,6 +532,11 @@ class ARIA(nn.Module):
         for block in self.blocks:
             params.extend(block.mlp.slow_parameters())
         return params
+
+    def freeze_task_adapter(self, task_id: int) -> None:
+        """Freeze task adapter after training — new tasks can never overwrite it."""
+        for p in self.fast_adapters[task_id].parameters():
+            p.requires_grad_(False)
 
     def snapshot_slow(self) -> None:
         """Store frozen copy of current slow weights. Called after each consolidation."""
