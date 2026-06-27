@@ -232,6 +232,24 @@ python scripts/main.py --benchmark split_mnist --seeds 42 123 999 7 2024
 
 ---
 
+## aria-trl: LLM Fine-tuning
+
+ARIA's mechanisms are not limited to computer vision. **[aria-trl](https://github.com/rsd-darshan/ARIA-TRL)** ports three core ARIA ideas to Hugging Face's TRL library for continual learning in LLM fine-tuning:
+
+- **PlasticityGatedMLP**: Fast/slow pathways in transformer FFN layers
+- **Slow-Pathway Consolidation (SPC)**: Fisher-weighted regularization during sequential task training
+- **Task-Specific Adapters**: Lightweight, frozen residual modules per task
+
+If you're fine-tuning LLMs on multiple tasks and want to prevent catastrophic forgetting, try `aria-trl`:
+
+```bash
+pip install aria-trl
+```
+
+See [aria-trl README](https://github.com/rsd-darshan/ARIA-TRL) for quickstart and working example on DistilGPT2.
+
+---
+
 ## Limitations & Future Work
 
 - Evaluated on image classification continual-learning benchmarks; larger-scale and language settings are future work.
