@@ -1,0 +1,32 @@
+{
+  "ARIA": {
+    "mean_acc": 93.67,
+    "std_acc": 1.66,
+    "mean_bwt": -7.68,
+    "std_bwt": 2.09
+  },
+  "EWC": {
+    "mean_acc": 96.48,
+    "std_acc": 0.94,
+    "mean_bwt": -4.17,
+    "std_bwt": 1.16
+  },
+  "Scaled-EWC": {
+    "mean_acc": 84.89,
+    "std_acc": 2.39,
+    "mean_bwt": -18.67,
+    "std_bwt": 2.96
+  },
+  "Static-MLP": {
+    "mean_acc": 94.89,
+    "std_acc": 2.47,
+    "mean_bwt": -6.16,
+    "std_bwt": 3.07
+  },
+  "DER++": {
+    "mean_acc": 92.53,
+    "std_acc": 2.31,
+    "mean_bwt": -9.07,
+    "std_bwt": 2.9
+  }
+}
